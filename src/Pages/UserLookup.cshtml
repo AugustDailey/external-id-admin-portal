@@ -1,0 +1,28 @@
+﻿@page
+@model UserLookupModel
+@{
+    ViewData["Title"] = "User Lookup";
+}
+
+<h2>User Lookup</h2>
+
+<form method="post">
+    <label for="upn">Enter User UPN:</label>
+    <input type="text" id="upn" name="UPN" value="@Model.UPN" />
+    <button type="submit">Search</button>
+</form>
+
+@if (Model.UserAttributes != null)
+{
+    <h3>User Attributes</h3>
+    <table>
+        <tr><th>Attribute</th><th>Value</th></tr>
+        @foreach (var attr in Model.UserAttributes)
+        {
+            <tr>
+                <td>@attr.Key</td>
+                <td>@attr.Value</td>
+            </tr>
+        }
+    </table>
+}
