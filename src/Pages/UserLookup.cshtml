@@ -6,23 +6,32 @@
 
 <h2>User Lookup</h2>
 
-<form method="post">
-    <label for="upn">Enter User UPN:</label>
-    <input type="text" id="upn" name="UPN" value="@Model.UPN" />
+<!-- Search Form -->
+<form method="post" asp-page-handler="Search">
+    <div style="margin-bottom: 10px;">
+        <label for="upn" style="display: block; font-weight: bold;">Enter User UPN:</label>
+        <input type="text" id="upn" name="UPN" value="@Model.UPN" style="width: 400px; padding: 6px;" />
+    </div>
     <button type="submit">Search</button>
 </form>
 
-@if (Model.UserAttributes != null)
+
+@if (Model.UserAttributes != null && Model.UserAttributes.Count > 0)
 {
-    <h3>User Attributes</h3>
-    <table>
-        <tr><th>Attribute</th><th>Value</th></tr>
+    <h3>Edit User Attributes</h3>
+
+    <!-- Editable Form -->
+    <form method="post" asp-page-handler="Save">
         @foreach (var attr in Model.UserAttributes)
         {
-            <tr>
-                <td>@attr.Key</td>
-                <td>@attr.Value</td>
-            </tr>
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-weight: bold;">@attr.Key</label>
+                <input type="text" name="UserAttributes[@attr.Key]" value="@attr.Value" style="width: 400px; padding: 6px;" />
+            </div>
         }
-    </table>
+
+        <input type="hidden" name="UPN" value="@Model.UPN" />
+        <button type="submit">Save</button>
+    </form>
+
 }
