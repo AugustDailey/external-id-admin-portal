@@ -28,17 +28,22 @@ namespace src.Pages
 
             try
             {
-                var user = await graphClient.Users[UPN]
-                    .GetAsync();
+
+                var user = await graphClient.Users[UPN].GetAsync((requestConfiguration) =>
+                {
+                    requestConfiguration.QueryParameters.Select = new string[] { "displayName", "givenName", "identities", "extension_52104e8f53e04ca29658b024fba16661_userType" };
+                });
+
 
                 UserAttributes = new Dictionary<string, string>
-            {
-                { "Display Name", user.DisplayName },
-                { "Email", user.Mail },
-                { "UPN", user.UserPrincipalName },
-                { "Job Title", user.JobTitle },
-                { "Department", user.Department }
-            };
+                {
+                    { "Display Name", user.DisplayName },
+                    { "First Name", user.GivenName },
+                    { "Last Name", user.Surname },
+                    { "Username", user.Identities.First(x => x.SignInType == "emailAddress").IssuerAssignedId },
+                    { "User Type", (string)user.AdditionalData["extension_52104e8f53e04ca29658b024fba16661_userType"] },
+                    { "Department", user.Department }
+                };
             }
             catch (ServiceException ex)
             {

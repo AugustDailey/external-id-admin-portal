@@ -27,7 +27,7 @@ namespace src
                 .AddMicrosoftIdentityUI();
 
             builder.Services.Configure<GraphOptions>(
-            builder.Configuration.GetSection("AzureAd"));
+            builder.Configuration.GetSection("GraphApi"));
 
 
             var app = builder.Build();
