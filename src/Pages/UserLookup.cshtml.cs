@@ -5,6 +5,8 @@ using Azure.Identity;
 using Microsoft.Extensions.Options;
 using src.Options;
 using Microsoft.Graph.Models;
+using src.Services;
+using System.Reflection;
 
 namespace src.Pages
 {
@@ -16,10 +18,45 @@ namespace src.Pages
         [BindProperty]
         public Dictionary<string, string> UserAttributes { get; set; }
         public GraphOptions GraphOptions { get; set; }
-        public UserLookupModel(IOptions<GraphOptions> graphOptions)
+        public IGraphUserConfigService GraphUserConfigService { get; set; }
+
+        public Dictionary<string,string> AllAttributes
+        {
+            get
+            {
+                if (_allAttributes == null)
+                {
+                    _allAttributes = new Dictionary<string,string>();
+                    foreach(var attr in _defaultAttributes)
+                    {
+                        _allAttributes.Add(attr.Key, attr.Value);
+                    }
+                    foreach(var attr in GraphUserConfigService.GetUserAttributeMapping())
+                    {
+                        _allAttributes.TryAdd(attr.Key, attr.Value);
+                    }
+                }
+
+                return _allAttributes;
+            }
+        }
+
+        private Dictionary<string, string> _defaultAttributes = new Dictionary<string, string>()
+        {
+            { "Display Name", "DisplayName" },
+            { "First Name", "GivenName" },
+            { "Last Name", "Surname" },
+            { "Identities", "Identities" }
+        };
+
+        private Dictionary<string, string> _allAttributes;
+
+        public UserLookupModel(IOptions<GraphOptions> graphOptions, IGraphUserConfigService graphUserConfigService)
         {
             GraphOptions = graphOptions.Value;
+            GraphUserConfigService = graphUserConfigService;
         }
+
 
         public async Task<IActionResult> OnPostSearchAsync()
         {
@@ -30,22 +67,14 @@ namespace src.Pages
 
             try
             {
-
+                var attributesToFetch = AllAttributes;
                 var user = await graphClient.Users[UPN].GetAsync((requestConfiguration) =>
                 {
-                    requestConfiguration.QueryParameters.Select = new string[] { "displayName", "givenName", "identities", "extension_52104e8f53e04ca29658b024fba16661_userType" };
+                    requestConfiguration.QueryParameters.Select = attributesToFetch.Values.ToArray();
                 });
 
-
-                UserAttributes = new Dictionary<string, string>
-                {
-                    { "Display Name", user.DisplayName },
-                    { "First Name", user.GivenName },
-                    { "Last Name", user.Surname },
-                    { "Username", user.Identities.First(x => x.SignInType == "emailAddress").IssuerAssignedId },
-                    { "User Type", (string)user.AdditionalData["extension_52104e8f53e04ca29658b024fba16661_userType"] },
-                    { "Department", user.Department }
-                };
+                UserAttributes = BuildAttributeDict(user);
+                
             }
             catch (ServiceException ex)
             {
@@ -58,21 +87,76 @@ namespace src.Pages
             return Page();
         }
 
+        private Dictionary<string, string> BuildAttributeDict(Microsoft.Graph.Models.User user)
+        {
+            var result = new Dictionary<string, string>
+            {
+            };
+
+            foreach (var attributeMapping in AllAttributes)
+            {
+                if (attributeMapping.Value.StartsWith("extension_"))
+                {
+                    result.Add(attributeMapping.Key, (string)user.AdditionalData[attributeMapping.Value]);
+                }
+                else if(attributeMapping.Value.Contains("Identities"))
+                {
+                    foreach(var identity in user.Identities)
+                    {
+                        result.Add($"identities.{identity.SignInType}", identity.IssuerAssignedId);
+                    }
+                }
+                else
+                {
+                    PropertyInfo prop = typeof(Microsoft.Graph.Models.User).GetProperty(attributeMapping.Value);
+                    if (prop != null)
+                    {
+                        result.Add(attributeMapping.Key, (string)prop.GetValue(user));
+                        //Console.WriteLine($"Value of {attributeMapping.Value}: {value}");
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private User UpdateUserFromMapping()
+        {
+            var user = new User() { AdditionalData = new Dictionary<string,object>() };
+
+            foreach (var kv in UserAttributes)
+            {
+                if (AllAttributes.TryGetValue(kv.Key, out string val))
+                {
+                    if (val.StartsWith("extension"))
+                    {
+                        user.AdditionalData.TryAdd(val, kv.Value);
+                    }
+                    else
+                    {
+                        PropertyInfo prop = typeof(Microsoft.Graph.Models.User).GetProperty(val);
+
+                        if (prop != null && prop.CanWrite)
+                        {
+                            prop.SetValue(user, Convert.ChangeType(kv.Value, prop.PropertyType));
+                        }
+                    }
+                }
+            }
+
+            return user;
+        }
+
         public async Task<IActionResult> OnPostSaveAsync()
         {
             var graphClient = new GraphServiceClient(new ClientSecretCredential(GraphOptions.TenantId, GraphOptions.ClientId, GraphOptions.ClientSecret));
-
-            var userUpdate = new User
+            var user = await graphClient.Users[UPN].GetAsync((requestConfiguration) =>
             {
-                DisplayName = UserAttributes["Display Name"],
-                GivenName = UserAttributes["First Name"],
-                Surname = UserAttributes["Last Name"],
-                Department = UserAttributes["Department"],
-                AdditionalData = new Dictionary<string, object>
-                {
-                    { "extension_52104e8f53e04ca29658b024fba16661_userType", UserAttributes["User Type"] }
-                }
-            };
+                requestConfiguration.QueryParameters.Select = AllAttributes.Values.ToArray();
+            });
+
+            var userUpdate = UpdateUserFromMapping();
+            
 
             try
             {

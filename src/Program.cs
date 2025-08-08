@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
 using src.Options;
+using src.Services;
 
 namespace src
 {
@@ -27,7 +28,10 @@ namespace src
                 .AddMicrosoftIdentityUI();
 
             builder.Services.Configure<GraphOptions>(
-            builder.Configuration.GetSection("GraphApi"));
+                builder.Configuration.GetSection("GraphApi"));
+
+            //builder.Services.AddScoped<IConfiguration>();
+            builder.Services.AddScoped<IGraphUserConfigService, GraphUserConfigService>();
 
 
             var app = builder.Build();
