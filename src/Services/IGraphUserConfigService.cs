@@ -4,5 +4,6 @@
     {
         string GetExtensionAttributeGuid();
         Dictionary<string, string> GetUserAttributeMapping();
+        Dictionary<string, string> GetSearchableAttributes();
     }
 }

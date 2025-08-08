@@ -7,16 +7,20 @@ using src.Options;
 using Microsoft.Graph.Models;
 using src.Services;
 using System.Reflection;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace src.Pages
 {
     public class UserLookupModel : PageModel
     {
         [BindProperty]
-        public string UPN { get; set; }
-
-        [BindProperty]
         public Dictionary<string, string> UserAttributes { get; set; }
+        [BindProperty]
+        public string SelectedAttribute { get; set; }
+        [BindProperty]
+        public string SearchValue { get; set; }
+        [BindProperty]
+        public List<SelectListItem> SearchableAttributes {get;set;}
         public GraphOptions GraphOptions { get; set; }
         public IGraphUserConfigService GraphUserConfigService { get; set; }
 
@@ -43,6 +47,7 @@ namespace src.Pages
 
         private Dictionary<string, string> _defaultAttributes = new Dictionary<string, string>()
         {
+            { "UPN", "UserPrincipalName" },
             { "Display Name", "DisplayName" },
             { "First Name", "GivenName" },
             { "Last Name", "Surname" },
@@ -58,9 +63,32 @@ namespace src.Pages
         }
 
 
+        public void OnGet()
+        {
+            LoadSearchableAttributes();
+        }
+
+        private void LoadSearchableAttributes(string selected = null)
+        {
+            SearchableAttributes = GraphUserConfigService.GetSearchableAttributes().Select(kvp => new SelectListItem
+            {
+                Text = kvp.Key,
+                Value = kvp.Value
+            }).ToList();
+
+            SearchableAttributes.Insert(0, new SelectListItem("Login ID", "Identities"));
+
+            if (!string.IsNullOrEmpty(selected))
+            {
+                SearchableAttributes.First(x => x.Value.Equals(selected)).Selected = true;
+            }
+        }
+
+
+
         public async Task<IActionResult> OnPostSearchAsync()
         {
-            if (string.IsNullOrWhiteSpace(UPN))
+            if (string.IsNullOrWhiteSpace(SearchValue) || string.IsNullOrWhiteSpace(SelectedAttribute))
                 return Page();
 
             var graphClient = new GraphServiceClient(new ClientSecretCredential(GraphOptions.TenantId, GraphOptions.ClientId, GraphOptions.ClientSecret));
@@ -68,24 +96,32 @@ namespace src.Pages
             try
             {
                 var attributesToFetch = AllAttributes;
-                var user = await graphClient.Users[UPN].GetAsync((requestConfiguration) =>
-                {
-                    requestConfiguration.QueryParameters.Select = attributesToFetch.Values.ToArray();
-                });
 
-                UserAttributes = BuildAttributeDict(user);
-                
+                var users = await graphClient.Users
+                    .GetAsync(request =>
+                    {
+                        request.QueryParameters.Filter = SelectedAttribute.Equals("Identities") ? $"identities/any(id:id/issuer eq 'ExternalMngEnvMCAP508975.onmicrosoft.com' and id/issuerAssignedId eq '{SearchValue}')" : $"{SelectedAttribute} eq '{SearchValue}'";
+                        request.QueryParameters.Select = attributesToFetch.Values.ToArray();
+                    });
+
+                var user = users?.Value?.FirstOrDefault();
+
+                UserAttributes = user != null
+                    ? BuildAttributeDict(user)
+                    : new Dictionary<string, string> { { "Error", "User not found." } };
             }
             catch (ServiceException ex)
             {
                 UserAttributes = new Dictionary<string, string>
-                {
-                    { "Error", ex.Message }
-                };
+        {
+            { "Error", ex.Message }
+        };
             }
 
+            LoadSearchableAttributes(SelectedAttribute);
             return Page();
         }
+
 
         private Dictionary<string, string> BuildAttributeDict(Microsoft.Graph.Models.User user)
         {
@@ -97,7 +133,8 @@ namespace src.Pages
             {
                 if (attributeMapping.Value.StartsWith("extension_"))
                 {
-                    result.Add(attributeMapping.Key, (string)user.AdditionalData[attributeMapping.Value]);
+                    user.AdditionalData.TryGetValue(attributeMapping.Value, out object val);
+                    result.Add(attributeMapping.Key, (string)val);
                 }
                 else if(attributeMapping.Value.Contains("Identities"))
                 {
@@ -126,6 +163,11 @@ namespace src.Pages
 
             foreach (var kv in UserAttributes)
             {
+                if (string.IsNullOrEmpty(kv.Value))
+                {
+                    continue;
+                }
+
                 if (AllAttributes.TryGetValue(kv.Key, out string val))
                 {
                     if (val.StartsWith("extension"))
@@ -150,23 +192,19 @@ namespace src.Pages
         public async Task<IActionResult> OnPostSaveAsync()
         {
             var graphClient = new GraphServiceClient(new ClientSecretCredential(GraphOptions.TenantId, GraphOptions.ClientId, GraphOptions.ClientSecret));
-            var user = await graphClient.Users[UPN].GetAsync((requestConfiguration) =>
-            {
-                requestConfiguration.QueryParameters.Select = AllAttributes.Values.ToArray();
-            });
-
             var userUpdate = UpdateUserFromMapping();
             
 
             try
             {
-                await graphClient.Users[UPN].PatchAsync(userUpdate);
+                await graphClient.Users[userUpdate.UserPrincipalName].PatchAsync(userUpdate);
             }
             catch (ServiceException ex)
             {
                 ModelState.AddModelError(string.Empty, $"Error updating user: {ex.Message}");
             }
 
+            LoadSearchableAttributes(SelectedAttribute);
             return await OnPostSearchAsync(); // Or return Page() to stay on the same page
         }
 

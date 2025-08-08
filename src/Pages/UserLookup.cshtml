@@ -9,11 +9,22 @@
 <!-- Search Form -->
 <form method="post" asp-page-handler="Search">
     <div style="margin-bottom: 10px;">
-        <label for="upn" style="display: block; font-weight: bold;">Enter User UPN:</label>
-        <input type="text" id="upn" name="UPN" value="@Model.UPN" style="width: 400px; padding: 6px;" />
+        <label for="searchAttribute" style="display: block; font-weight: bold;">Select Attribute:</label>
+        <select name="SelectedAttribute" style="width: 400px; padding: 6px;">
+            @foreach (var item in Model.SearchableAttributes)
+            {
+                <option value="@item.Value" selected="@item.Selected">@item.Text</option>
+            }
+        </select>
+
+    </div>
+    <div style="margin-bottom: 10px;">
+        <label for="searchValue" style="display: block; font-weight: bold;">Enter Search Value:</label>
+        <input type="text" id="searchValue" name="SearchValue" value="@Model.SearchValue" style="width: 400px; padding: 6px;" />
     </div>
     <button type="submit">Search</button>
 </form>
+
 
 
 @if (Model.UserAttributes != null && Model.UserAttributes.Count > 0)
@@ -30,7 +41,6 @@
             </div>
         }
 
-        <input type="hidden" name="UPN" value="@Model.UPN" />
         <button type="submit">Save</button>
     </form>
 
