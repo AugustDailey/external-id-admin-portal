@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace src.Pages
 {
-    public class UserLookupModel : PageModel
+    public class UserManagementModel : PageModel
     {
         [BindProperty]
         public Dictionary<string, string> UserAttributes { get; set; }
@@ -56,7 +56,7 @@ namespace src.Pages
 
         private Dictionary<string, string> _allAttributes;
 
-        public UserLookupModel(IOptions<GraphOptions> graphOptions, IGraphUserConfigService graphUserConfigService)
+        public UserManagementModel(IOptions<GraphOptions> graphOptions, IGraphUserConfigService graphUserConfigService)
         {
             GraphOptions = graphOptions.Value;
             GraphUserConfigService = graphUserConfigService;

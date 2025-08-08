@@ -44,6 +44,12 @@ namespace src
                 app.UseHsts();
             }
 
+            app.MapGet("/", context =>
+            {
+                context.Response.Redirect("/UserManagement");
+                return Task.CompletedTask;
+            });
+
             app.UseHttpsRedirection();
             app.UseStaticFiles();
 
