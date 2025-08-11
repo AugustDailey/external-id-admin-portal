@@ -1,6 +1,16 @@
 # External ID Admin Portal (.NET 8)
 
-A custom admin portal built with .NET 8 for managing identities via Microsoft Entra External ID.
+## 🧠 How It Works
+
+The **External ID Admin Portal** is a custom .NET 8 application that enables **Microsoft Entra ID (Workforce)** users to manage identities in a **Microsoft Entra External ID** tenant.
+
+### Key Features:
+- Authenticated Entra ID users can view, search, and manage External ID users.
+- Uses **Microsoft Graph API** to interact with the configured External ID tenant.
+- Supports custom user attribute mappings and search filters.
+
+This portal is ideal for organizations that need to delegate external identity management to internal teams without exposing full administrative access to the External ID tenant.
+
 
 ## 🚀 Prerequisites
 
